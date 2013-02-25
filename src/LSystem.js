@@ -15,7 +15,7 @@
         }
 
         for (prop in rules) {
-            if (!(prop in this.operators)) {
+            if (!(prop in this.operators) && !this.operators.otherwise) {
                 throw new Error('operator ' + prop + ' is not defined');
             }
             rule = rules[prop];
@@ -42,7 +42,13 @@
             var i, l, op;
             for (i = 0, l = opNames.length; i < l; i++) {
                 op = this.operators[opNames[i]];
-                op.exec(ctx);
+                if (op) {
+                    op.exec(ctx);
+                } else if (this.operators.otherwise) {
+                    this.operators.otherwise.exec(ctx);
+                } else {
+                    throw new Error('operator ' + opNames[i] + ' is not defined');
+                }
             }
         },
         _replace: function(opNames) {
