@@ -1,0 +1,321 @@
+<html>
+
+<head>
+<title>noname</title>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="width=320, user-scalable=no">
+
+<script type="text/javascript" src="lsys.js"></script>
+<script type="text/javascript">
+
+var Turtle = function(ctx) {
+    this.x = 0;
+    this.y = 0;
+    this.r = 0;
+    this.state = [];
+    this.context = ctx;
+};
+Turtle.prototype = {
+    start: function(x, y) {
+        this.x = x;
+        this.y = y;
+        this.context.moveTo(x, y);
+    },
+    turn: function(rad) {
+        this.r += rad;
+    },
+    move: function(dist) {
+        var r = this.r;
+        var dx = Math.cos(r) * dist;
+        var dy = Math.sin(r) * dist;
+        var x = this.x + dx;
+        var y = this.y + dy;
+        this.context.lineTo(x, y);
+        this.x = x;
+        this.y = y;
+    },
+    pushState: function() {
+        this.state.push([ this.x, this.y, this.r ]);
+    },
+    popState: function() {
+        var state = this.state.pop();
+        var x = this.x = state[0];
+        var y = this.y = state[1];
+        this.r = state[2];
+        this.context.moveTo(x, y);
+    }
+};
+
+window.addEventListener('load', function() {
+
+    var cvs = document.getElementById('cvs');
+    var ctx = cvs.getContext('2d');
+    var turtle = new Turtle(ctx);
+
+    var opForms = [];
+    var examples = {
+        koch: {
+            iteration: 5,
+            initX: 320,
+            initY: 40,
+            initR: 60,
+            rotLangle: -60,
+            rotRangle: 60,
+            movLength: 2,
+            initial: 'F--F--F--',
+            rules: {
+                F: 'F+F--F+F'
+            }
+        },
+        dragonCurve: {
+            iteration: 14,
+            initX: 320,
+            initY: 160,
+            initR: 0,
+            rotLangle: -90,
+            rotRangle: 90,
+            movLength: 1.5,
+            initial: 'FX',
+            rules: {
+                X: 'X+YF+',
+                Y: '-FX-Y'
+            }
+        },
+        sierpinskiGasket: {
+            iteration: 8,
+            initX: 0,
+            initY: 640,
+            initR: 0,
+            rotLangle: -60,
+            rotRangle: 60,
+            movLength: 2,
+            initial: 'A',
+            rules: {
+                A: 'B-A-B',
+                B: 'A+B+A'
+            }
+        },
+        branch: {
+            iteration: 4,
+            initX: 0,
+            initY: 320,
+            initR: 0,
+            rotLangle: -60,
+            rotRangle: 60,
+            movLength: 2.5,
+            initial: 'F',
+            rules: {
+                F: 'FF[-F+F]FF'
+            }
+        },
+        plant: {
+            iteration: 5,
+            initX: 320,
+            initY: 640,
+            initR: -90,
+            rotLangle: -24,
+            rotRangle: 24,
+            movLength: 7,
+            initial: 'X',
+            rules: {
+                X: 'F-[[X]+X]+F[+FX]-X',
+                F: 'FF'
+            }
+        },
+        penroseTiling: {
+            iteration: 5,
+            initX: 320,
+            initY: 320,
+            initR: 0,
+            rotLangle: -36,
+            rotRangle: 36,
+            movLength: 8,
+            initial: '[N]++[N]++[N]++[N]++[N]',
+            rules: {
+                M: 'OA++PA----NA[-OA----MA]++',
+                N: '+OA--PA[---MA--NA]+',
+                O: '-MA++NA[+++OA++PA]-',
+                P: '--OA++++MA[+PA++++NA]--NA',
+                A: ''
+            }
+        }
+    };
+
+    var exSelect = document.getElementById('exSelect');
+    exSelect.addEventListener('change', function() {
+        var ex = examples[this.value];
+        var elem;
+        if (ex) {
+            for (var prop in ex) {
+                elem = document.getElementById(prop);
+                if (elem) {
+                    elem.value = ex[prop];
+                }
+            }
+            var n = 1;
+            var rules = document.getElementById('rules');
+            rules.innerHTML = '';
+            for (var prop in ex.rules) {
+                rules.appendChild(createOpForm(n, prop, ex.rules[prop]));
+                n++;
+            }
+        }
+    });
+    var opt;
+    for (var prop in examples) {
+        opt = document.createElement('option');
+        opt.textContent = opt.value = prop;
+        exSelect.appendChild(opt);
+    }
+
+    var addOp = document.getElementById('addOp');
+    addOp.addEventListener('click', function() {
+        var rules = document.getElementById('rules');
+        var n = rules.childNodes.length;
+        rules.appendChild(createOpForm(n, '', ''));
+    });
+
+    var result = document.getElementById('result');
+
+    var runButton = document.getElementById('runButton');
+    runButton.addEventListener('click', function() {
+        var iteration = parseFloat(document.getElementById('iteration').value, 10);
+        var sx = parseFloat(document.getElementById('initX').value, 10);
+        var sy = parseFloat(document.getElementById('initY').value, 10);
+        var rot = parseFloat(document.getElementById('initR').value, 10);
+        var rotL = parseFloat(document.getElementById('rotLangle').value, 10);
+        var rotR = parseFloat(document.getElementById('rotRangle').value, 10);
+        var mov = parseFloat(document.getElementById('movLength').value, 10);
+        var initial = document.getElementById('initial').value.split('');
+
+        var rules = document.getElementById('rules');
+        var names = rules.getElementsByClassName('opName');
+        var repls = rules.getElementsByClassName('opRepl');
+        var R = {};
+        var name, repl;
+        for (var i = 0, l = names.length; i < l; i++) {
+            R[names[i].value] = repls[i].value.split('');
+        }
+
+        var sys = new lsys.LSystem({
+            '+': function() {
+                turtle.turn(rotL * Math.PI / 180);
+            },
+            '-': function() {
+                turtle.turn(rotR * Math.PI / 180);
+            },
+            '[': function() {
+                turtle.pushState();
+            },
+            ']': function() {
+                turtle.popState();
+            },
+            otherwise: function() {
+                turtle.move(mov);
+            }
+        }, R);
+
+        ctx.clearRect(0, 0, cvs.width, cvs.height);
+        ctx.beginPath();
+        turtle.start(sx, sy);
+        turtle.r = rot * Math.PI / 180;
+        result.value = sys.generate(initial, iteration).join('');
+        sys.exec(initial, iteration);
+        ctx.stroke();
+
+    });
+
+    var parseDiv = document.createElement('div');
+    var createOpForm = function(n, name, replace) {
+        name = name || '';
+        replace = replace || '';
+        parseDiv.innerHTML = '<div>' +
+            'Rule: ' +
+            '<input type="text" class="opName" id="opName' + n + '" value="' +
+            name +
+            '">' +
+            '</input>' +
+            ' = ' +
+            '<input type="text" class="opRepl" id="opRepl' + n + '" value="' +
+            replace +
+            '">' +
+            '</input>' +
+            '<button class="delButton" id="opDel' + n + '">' +
+                'Delete' +
+            '</button>' +
+        '</div>';
+        var formDiv = parseDiv.firstChild;
+        parseDiv.removeChild(formDiv);
+        var delButton = formDiv.getElementsByClassName('delButton')[0];
+        delButton.addEventListener('click', function() {
+            this.parentNode.parentNode.removeChild(this.parentNode);
+        });
+        return formDiv;
+    };
+});
+
+</script>
+<style type="text/css">
+    body, input, textarea {
+        margin: 0;
+        font-size: 12px;
+        font-family: Menlo;
+    }
+    textarea {
+        width: 400px;
+        height: 200px;
+    }
+    div#menu {
+        float: left;
+    }
+    div#preview {
+        float: left;
+    }
+    input.opName {
+        width: 2em;
+    }
+    input.opRepl {
+        width: 64%;
+    }
+    canvas {
+        border: 1px solid Black;
+    }
+</style>
+</head>
+
+<body>
+
+<div id="menu">
+    <p>
+    <div>Examples: <select id="exSelect">
+        <option>examples...</option>
+    </select></div>
+    </p>
+    <p>
+        <div>Iteration: <input type="number" id="iteration"></input></div>
+        <div>Turtle initial X: <input type="number" id="initX"></input></div>
+        <div>Turtle initial Y: <input type="number" id="initY"></input></div>
+        <div>Turtle initial Rot: <input type="number" id="initR"></input></div>
+        <div>Turtle +angle: <input type="number" id="rotLangle"></input></div>
+        <div>Turtle -angle: <input type="number" id="rotRangle"></input></div>
+        <div>Turtle move: <input type="number" id="movLength"></input></div>
+    </p>
+    <p>
+        <div id="rules"></div>
+    </p>
+        <button id="addOp">Add Operation</button>
+    </p>
+    </p>
+    <p>
+        <div>Seed: <input type="text" id="initial"></input> <button id="runButton">Run</button> </div>
+    </p>
+    <p>
+        <textarea id="result">result</textarea>
+    </p>
+</div>
+<div id="preview">
+    <canvas id="cvs" width=640 height=640></canvas>
+</div>
+</body>
+
+</html>
